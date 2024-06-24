@@ -5,6 +5,15 @@ namespace Syntech\Dashboard\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Syntech\Dashboard\Services\ControllerContent;
+use Syntech\Dashboard\Services\DatatableContent;
+use Syntech\Dashboard\Services\MigrationContent;
+use Syntech\Dashboard\Services\ModelContent;
+use Syntech\Dashboard\Services\RequestContent;
+use Syntech\Dashboard\Services\ResourceContent;
+use Syntech\Dashboard\Services\ViewContent;
+
+use function Laravel\Prompts\confirm;
 
 class CreateDashboard extends Command
 {
@@ -24,6 +33,8 @@ class CreateDashboard extends Command
         $requestPath = app_path("Http/Requests/{$baseNamespace}/{$controllerName}Request.php");
         $resourcePath = app_path("Http/Resources/{$baseNamespace}/{$controllerName}Resource.php");
         $viewPath = resource_path("views/{$baseNamespace}/" . Str::snake($controllerName) . ".blade.php");
+        $modelPath = app_path("Models/{$modelName}.php");
+        $migrationPath = database_path('migrations/' . date('Y_m_d_His') . '_create_' . Str::snake($modelName) . '_table.php');
 
         // Create directories if they don't exist
         File::makeDirectory(dirname($controllerPath), 0755, true, true);
@@ -32,9 +43,20 @@ class CreateDashboard extends Command
         File::makeDirectory(dirname($resourcePath), 0755, true, true);
         File::makeDirectory(dirname($viewPath), 0755, true, true);
 
+        if(confirm('Do you want to create a model and migration file?')){
+
+            File::makeDirectory(dirname($modelPath), 0755, true, true);
+            File::makeDirectory(dirname($migrationPath), 0755, true, true);
+
+            File::put($modelPath, $this->getModelContent($namespace));
+            File::put($migrationPath, $this->getMigrationContent($namespace));
+
+        }
+
+
         // Create files with content
         File::put($controllerPath, $this->getControllerContent($namespace, $modelName));
-        File::put($datatablePath, $this->getDatatableContent($namespace));
+        File::put($datatablePath, $this->getDatatableContent($namespace, $modelName, $modelPath));
         File::put($requestPath, $this->getRequestContent($namespace));
         File::put($resourcePath, $this->getResourceContent($namespace));
         File::put($viewPath, $this->getViewContent($namespace));
@@ -42,171 +64,98 @@ class CreateDashboard extends Command
         $this->info('Dashboard resources created successfully.');
     }
 
+    /**
+     * Get the content for the controller file
+     *
+     * @param string $namespace
+     * @param string $modelName
+     * @return string
+     */
+
     protected function getControllerContent($namespace, $modelName)
     {
-        $controllerName = class_basename($namespace);
-        $viewPath = 'admin.location.' . strtolower($controllerName);
+        $content = new ControllerContent();
 
-        return <<<EOT
-<?php
+        return $content->getControllerContent($namespace, $modelName);
+    }
 
-namespace App\Http\Controllers\\{$namespace};
+    /**
+     * Get the content for the datatable file
+     *
+     * @param string $namespace
+     * @return string
+     */
 
-use Syntech\Dashboard\Http\Controllers\BaseController;
-use App\DataTables\\{$namespace}\\{$controllerName}DataTable;
-use App\Http\Requests\\{$namespace}\\{$controllerName}Request;
-use App\Http\Resources\\{$namespace}\\{$controllerName}Resource;
-use  Syntech\Dashboard\Repositories\BaseRepository;
-use Illuminate\Http\Request;
-use App\Models\\{$modelName};
-
-class {$controllerName}Controller extends BaseController
-{
-    public \$repository;
-    public \$request;
-    public \$view;
-    public \$route;
-    public \$dataTable;
-
-    public function __construct(BaseRepository \$repository, Request \$request, {$controllerName}DataTable \$dataTable, {$modelName} \$model)
+    protected function getDatatableContent($namespace, $modelName, $modelPath)
     {
-        \$this->repository = \$repository;
-        \$this->request = \$request;
-        \$this->repository->setModel(\$model);
-        \$this->view = '{$viewPath}';
-        \$this->route = 'dashboard.' . strtolower(\$controllerName);
-        \$this->dataTable = \$dataTable;
-        \$this->repository->setRules(\$this->request->isMethod('POST') || \$this->request->isMethod('PUT') ? (new {$controllerName}Request())->rules() : []);
+        $content = new DatatableContent();
+
+        return $content->getDatatableContent($namespace, $modelName, $modelPath);
     }
 
-}
-EOT;
-    }
-
-    protected function getDatatableContent($namespace)
-    {
-        $datatableName = class_basename($namespace) . 'DataTable';
-
-        return <<<EOT
-<?php
-
-namespace App\DataTables\\{$namespace};
-
-use Yajra\DataTables\Services\DataTable;
-
-class {$datatableName} extends DataTable
-{
-    public function dataTable(\$query)
-    {
-        return datatables(\$query);
-    }
-
-    public function query()
-    {
-        // Define query logic
-    }
-
-    public function html()
-    {
-        return \$this->builder()
-                    ->columns(\$this->getColumns())
-                    ->minifiedAjax()
-                    ->addAction(['width' => '80px']);
-    }
-
-    protected function getColumns()
-    {
-        return [
-            'id',
-            'name',
-            // Add other columns here
-        ];
-    }
-
-    protected function filename()
-    {
-        return 'Datatable_' . date('YmdHis');
-    }
-}
-EOT;
-    }
+    /**
+     * Get the content for the request file
+     *
+     * @param string $namespace
+     * @return string
+     */
 
     protected function getRequestContent($namespace)
     {
-        $requestName = class_basename($namespace) . 'Request';
+        $content = new RequestContent();
 
-        return <<<EOT
-<?php
-
-namespace App\Http\Requests\\{$namespace};
-
-use Illuminate\Foundation\Http\FormRequest;
-
-class {$requestName} extends FormRequest
-{
-    public function authorize()
-    {
-        return true;
+        return $content->getRequestContent($namespace);
     }
 
-    public function rules()
-    {
-        return [
-            'name' => 'required|string|max:255',
-            // Add other rules here
-        ];
-    }
-}
-EOT;
-    }
+    /**
+     * Get the content for the resource file
+     *
+     * @param string $namespace
+     * @return string
+     */
 
     protected function getResourceContent($namespace)
     {
-        $resourceName = class_basename($namespace) . 'Resource';
+       $content = new ResourceContent();
 
-        return <<<EOT
-<?php
-
-namespace App\Http\Resources\\{$namespace};
-
-use Illuminate\Http\Resources\Json\JsonResource;
-
-class {$resourceName} extends JsonResource
-{
-    public function toArray(\$request)
-    {
-        return [
-            'id' => \$this->id,
-            'name' => \$this->name,
-            // Add other fields here
-        ];
+        return $content->getResourceContent($namespace);
     }
-}
-EOT;
-    }
+
+    /*
+        * Get the content for the view file
+        *
+        * @param string $namespace
+        * @return string
+        */
+
 
     protected function getViewContent($namespace)
     {
-        $controllerName = class_basename($namespace);
-        $snakeName = Str::snake($controllerName);
+         $content = new ViewContent();
 
-        return <<<EOT
-@extends('layouts.app')
+        return $content->getViewContent($namespace);
+    }
 
-@section('content')
-<div class="container">
-    <h1>{$controllerName} Dashboard</h1>
-    <div class="row">
-        <div class="col-md-12">
-            {!! \$dataTable->table(['class' => 'table table-bordered table-hover']) !!}
-        </div>
-    </div>
-</div>
-@endsection
+    /*
+        * Get the content for the model file
+        *
+        * @param string $namespace
+        * @return string
+        */
 
-@push('scripts')
-{!! \$dataTable->scripts() !!}
-@endpush
-EOT;
+    protected function getModelContent($namespace)
+    {
+        $content = new ModelContent();
+
+        return $content->getModelContent($namespace);
+    }
+
+
+
+    protected function getMigrationContent($namespace)
+    {
+        $content = new MigrationContent();
+
+        return $content->getMigrationContent($namespace);
     }
 }
