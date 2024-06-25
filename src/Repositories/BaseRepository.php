@@ -2,12 +2,14 @@
 
 namespace Syntech\Dashboard\Repositories;
 
-use App\Traits\ImageUpload;
+
 use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Yajra\DataTables\Services\DataTable;
 use Illuminate\Http\Request;
+use Syntech\Dashboard\Traits\ImageUpload;
+
   class BaseRepository
 {
     use ImageUpload;

@@ -28,11 +28,13 @@ class CreateDashboard extends Command
         $modelName = $controllerName;  // Assuming the model name is the same as the controller name
 
         // Paths
-        $controllerPath = app_path("Http/Controllers/{$baseNamespace}/{$controllerName}Controller.php");
-        $datatablePath = app_path("DataTables/{$baseNamespace}/{$controllerName}DataTable.php");
-        $requestPath = app_path("Http/Requests/{$baseNamespace}/{$controllerName}Request.php");
-        $resourcePath = app_path("Http/Resources/{$baseNamespace}/{$controllerName}Resource.php");
+        $controllerPath = app_path("Http/Controllers/{$baseNamespace}/{$controllerName}/{$controllerName}Controller.php");
+        $datatablePath = app_path("DataTables/{$baseNamespace}/{$controllerName}/{$controllerName}DataTable.php");
+        $requestPath = app_path("Http/Requests/{$baseNamespace}/{$controllerName}/{$controllerName}Request.php");
+        $resourcePath = app_path("Http/Resources/{$baseNamespace}/{$controllerName}/{$controllerName}Resource.php");
         $viewPath = resource_path("views/{$baseNamespace}/" . Str::snake($controllerName) . ".blade.php");
+
+
         $modelPath = app_path("Models/{$modelName}.php");
         $migrationPath = database_path('migrations/' . date('Y_m_d_His') . '_create_' . Str::snake($modelName) . '_table.php');
 
@@ -59,7 +61,39 @@ class CreateDashboard extends Command
         File::put($datatablePath, $this->getDatatableContent($namespace, $modelName, $modelPath));
         File::put($requestPath, $this->getRequestContent($namespace));
         File::put($resourcePath, $this->getResourceContent($namespace));
-        File::put($viewPath, $this->getViewContent($namespace));
+
+        if(confirm('Do you want to create a view file?')){
+
+            // ask for view path if the user wants to create a view file
+
+            $viewPath = $this->ask('Enter the view path');
+
+            // create index file
+
+            $indexViewPath = resource_path("views/". $viewPath . '/index.blade.php');
+
+            File::makeDirectory(dirname($indexViewPath), 0755, true, true);
+
+            File::put($indexViewPath, $this->getViewContent($namespace));
+
+            // create create file
+
+            $createViewPath = resource_path("views/". $viewPath . '/create.blade.php');
+
+            File::makeDirectory(dirname($createViewPath), 0755, true, true);
+
+            File::put($createViewPath, $this->getEmptyViewContent($namespace));
+
+            // create edit file
+
+            $editViewPath = resource_path("views/". $viewPath . '/edit.blade.php');
+
+            File::makeDirectory(dirname($editViewPath), 0755, true, true);
+
+            File::put($editViewPath, $this->getEmptyViewContent($namespace));
+
+
+        }
 
         $this->info('Dashboard resources created successfully.');
     }
@@ -134,6 +168,12 @@ class CreateDashboard extends Command
          $content = new ViewContent();
 
         return $content->getViewContent($namespace);
+    }
+
+    protected function getEmptyViewContent($namespace)
+    {
+
+        return '';
     }
 
     /*

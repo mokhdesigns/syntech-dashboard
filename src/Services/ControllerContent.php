@@ -13,7 +13,7 @@ class ControllerContent
     {
         $controllerName = class_basename($namespace);
 
-        $viewPath = 'admin.location.' . strtolower($controllerName);
+        $viewPath = 'admin.' . strtolower($controllerName);
 
         return <<<EOT
 <?php
@@ -25,7 +25,6 @@ use Syntech\Dashboard\Repositories\BaseRepository;
 use App\DataTables\\{$namespace}\\{$controllerName}DataTable;
 use App\Http\Requests\\{$namespace}\\{$controllerName}Request;
 use App\Http\Resources\\{$namespace}\\{$controllerName}Resource;
-use App\Repositories\BaseRepository;
 use Illuminate\Http\Request;
 use App\Models\\{$modelName};
 
